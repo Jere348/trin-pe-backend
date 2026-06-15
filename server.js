@@ -167,3 +167,18 @@ const PORT = 5001; // <--- CAMBIAMOS A 5001
 app.listen(PORT, () => {
     console.log(`Servidor Backend corriendo en http://localhost:${PORT}`);
 });
+
+// 6. RUTA PARA OBTENER TODOS LOS TRÁMITES (PANEL CIUDADANO)
+app.get('/api/tramites', async (req, res) => {
+    try {
+        // Buscamos todos los trámites, ordenados para que los más nuevos salgan primero
+        const sql = 'SELECT * FROM tramites ORDER BY fecha_creacion DESC';
+        const resultado = await pool.query(sql);
+        
+        // Enviamos la lista completa al frontend
+        res.json(resultado.rows);
+    } catch (error) {
+        console.error("🚨 ERROR AL OBTENER TRÁMITES:", error);
+        res.status(500).json({ error: 'Error interno al obtener los trámites' });
+    }
+});
