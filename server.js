@@ -36,6 +36,25 @@ pool.query(crearTablaQuery)
     .then(() => console.log('Tabla de usuarios verificada/creada.'))
     .catch((err) => console.error('Error al crear la tabla:', err));
 
+    // 2.5 CREAR LA TABLA DE TRÁMITES
+const crearTablaTramitesQuery = `
+    CREATE TABLE IF NOT EXISTS tramites (
+        id SERIAL PRIMARY KEY,
+        titulo TEXT NOT NULL,
+        codigo_interno TEXT,
+        descripcion TEXT,
+        entidad TEXT,
+        modalidad TEXT,
+        costo NUMERIC(10, 2),
+        requisitos JSONB,
+        pasos JSONB,
+        fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+`;
+
+pool.query(crearTablaTramitesQuery)
+    .then(() => console.log('Tabla de trámites verificada/creada.'))
+    .catch((err) => console.error('Error al crear la tabla de trámites:', err));
 // 3. RUTA DE REGISTRO
 app.post('/api/registro', async (req, res) => {
     // ESTA ES LA ALARMA NUEVA
@@ -94,7 +113,55 @@ app.post('/api/login', async (req, res) => {
         res.status(500).json({ error: 'Error en el servidor durante el login' });
     }
 });
+// 4.5 . RUTA PARA CREAR UN NUEVO TRÁMITE (PANEL ADMIN)
+app.post('/api/tramites', async (req, res) => {
+    console.log("=======================================");
+    console.log("📝 NUEVO TRÁMITE RECIBIDO DEL ADMIN");
+    console.log("Título:", req.body.titulo);
+    console.log("=======================================");
 
+    const { 
+        titulo, 
+        codigo_interno, 
+        descripcion, 
+        entidad, 
+        modalidad, 
+        costo, 
+        requisitos, 
+        pasos 
+    } = req.body;
+
+    try {
+        const sql = `
+            INSERT INTO tramites 
+            (titulo, codigo_interno, descripcion, entidad, modalidad, costo, requisitos, pasos) 
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
+            RETURNING id
+        `;
+        
+        // Convertimos los arrays a JSON (texto) para guardarlos en PostgreSQL
+        const valores = [
+            titulo, 
+            codigo_interno, 
+            descripcion, 
+            entidad, 
+            modalidad, 
+            costo || 0, // Si no hay costo, ponemos 0
+            JSON.stringify(requisitos), 
+            JSON.stringify(pasos)
+        ];
+
+        const resultado = await pool.query(sql, valores);
+        res.status(201).json({ 
+            mensaje: 'Trámite publicado con éxito', 
+            id: resultado.rows[0].id 
+        });
+        
+    } catch (error) {
+        console.error("🚨 ERROR AL GUARDAR TRÁMITE:", error);
+        res.status(500).json({ error: 'Error interno al guardar el trámite' });
+    }
+});
 // 5. ENCENDER EL SERVIDOR LOCAL
 const PORT = 5001; // <--- CAMBIAMOS A 5001
 app.listen(PORT, () => {
