@@ -82,9 +82,12 @@ const crearTablaEntidadesQuery = `
     );
 `;
 pool.query(crearTablaEntidadesQuery)
-    .then(() => console.log('Tabla de entidades verificada/creada.'))
-    .catch((err) => console.error('Error al crear tabla entidades:', err));
-
+    .then(() => {
+        console.log('Tabla de entidades verificada.');
+        // MAGIA: Agregamos la columna de logo por si no existe
+        return pool.query('ALTER TABLE entidades ADD COLUMN IF NOT EXISTS logo_url TEXT;');
+    })
+    .catch((err) => console.error('Error al verificar tabla entidades:', err));
 
 // 3. RUTA DE REGISTRO
 app.post('/api/registro', async (req, res) => {
@@ -310,11 +313,11 @@ app.get('/api/entidades', async (req, res) => {
 
 // B) Crear una nueva entidad
 app.post('/api/entidades', async (req, res) => {
-    const { sigla, nombre_completo } = req.body;
+    const { sigla, nombre_completo, logo_url } = req.body; // <-- Recibimos el logo
     try {
         await pool.query(
-            'INSERT INTO entidades (sigla, nombre_completo) VALUES ($1, $2)', 
-            [sigla.toUpperCase(), nombre_completo]
+            'INSERT INTO entidades (sigla, nombre_completo, logo_url) VALUES ($1, $2, $3)', 
+            [sigla.toUpperCase(), nombre_completo, logo_url] // <-- Lo guardamos
         );
         res.status(201).json({ mensaje: 'Entidad registrada con éxito' });
     } catch (error) {
