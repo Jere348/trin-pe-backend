@@ -55,6 +55,21 @@ const crearTablaTramitesQuery = `
 pool.query(crearTablaTramitesQuery)
     .then(() => console.log('Tabla de trámites verificada/creada.'))
     .catch((err) => console.error('Error al crear la tabla de trámites:', err));
+
+
+// 2.6 CREAR LA TABLA DE MÉTRICAS DE BÚSQUEDA
+const crearTablaMetricasQuery = `
+    CREATE TABLE IF NOT EXISTS metricas_busquedas (
+        id SERIAL PRIMARY KEY,
+        termino TEXT NOT NULL,
+        fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+`;
+pool.query(crearTablaMetricasQuery)
+    .then(() => console.log('Tabla de métricas verificada/creada.'))
+    .catch((err) => console.error('Error al crear tabla métricas:', err));
+
+
 // 3. RUTA DE REGISTRO
 app.post('/api/registro', async (req, res) => {
     // ESTA ES LA ALARMA NUEVA
@@ -162,11 +177,6 @@ app.post('/api/tramites', async (req, res) => {
         res.status(500).json({ error: 'Error interno al guardar el trámite' });
     }
 });
-// 5. ENCENDER EL SERVIDOR LOCAL
-const PORT = 5001; // <--- CAMBIAMOS A 5001
-app.listen(PORT, () => {
-    console.log(`Servidor Backend corriendo en http://localhost:${PORT}`);
-});
 
 // 6. RUTA PARA OBTENER TODOS LOS TRÁMITES (PANEL CIUDADANO)
 app.get('/api/tramites', async (req, res) => {
@@ -227,3 +237,50 @@ app.delete('/api/tramites/:id', async (req, res) => {
         res.status(500).json({ error: 'Error interno al eliminar' });
     }
 });
+
+// ==========================================
+// 9. RUTA PARA REGISTRAR UNA BÚSQUEDA (CIUDADANO)
+// ==========================================
+app.post('/api/metricas', async (req, res) => {
+    const { termino } = req.body;
+    
+    // Solo guardamos si escribió al menos 2 letras (para no llenar la base de datos de basura)
+    if (!termino || termino.trim().length < 2) {
+        return res.status(400).json({ error: 'Término muy corto' });
+    }
+
+    try {
+        // Guardamos el término en minúsculas para unificar (ej. "DNI" y "dni" son lo mismo)
+        await pool.query('INSERT INTO metricas_busquedas (termino) VALUES ($1)', [termino.toLowerCase().trim()]);
+        res.status(200).json({ mensaje: 'Búsqueda registrada' });
+    } catch (error) {
+        res.status(500).json({ error: 'Error al guardar métrica' });
+    }
+});
+
+// ==========================================
+// 10. RUTA PARA OBTENER EL TOP 10 (ADMIN)
+// ==========================================
+app.get('/api/metricas/top', async (req, res) => {
+    try {
+        // Esta consulta agrupa las palabras iguales, las cuenta y las ordena de mayor a menor
+        const sql = `
+            SELECT termino, COUNT(*) as cantidad 
+            FROM metricas_busquedas 
+            GROUP BY termino 
+            ORDER BY cantidad DESC 
+            LIMIT 10
+        `;
+        const resultado = await pool.query(sql);
+        res.status(200).json(resultado.rows);
+    } catch (error) {
+        res.status(500).json({ error: 'Error al obtener métricas' });
+    }
+});
+
+// 5. ENCENDER EL SERVIDOR LOCAL
+const PORT = 5001; // <--- CAMBIAMOS A 5001
+app.listen(PORT, () => {
+    console.log(`Servidor Backend corriendo en http://localhost:${PORT}`);
+});
+
