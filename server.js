@@ -70,6 +70,22 @@ pool.query(crearTablaMetricasQuery)
     .catch((err) => console.error('Error al crear tabla métricas:', err));
 
 
+// ==========================================
+// 2.7 CREAR LA TABLA DE ENTIDADES
+// ==========================================
+const crearTablaEntidadesQuery = `
+    CREATE TABLE IF NOT EXISTS entidades (
+        id SERIAL PRIMARY KEY,
+        sigla VARCHAR(50) NOT NULL,
+        nombre_completo VARCHAR(255) NOT NULL,
+        fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+`;
+pool.query(crearTablaEntidadesQuery)
+    .then(() => console.log('Tabla de entidades verificada/creada.'))
+    .catch((err) => console.error('Error al crear tabla entidades:', err));
+
+
 // 3. RUTA DE REGISTRO
 app.post('/api/registro', async (req, res) => {
     // ESTA ES LA ALARMA NUEVA
@@ -275,6 +291,44 @@ app.get('/api/metricas/top', async (req, res) => {
         res.status(200).json(resultado.rows);
     } catch (error) {
         res.status(500).json({ error: 'Error al obtener métricas' });
+    }
+});
+
+// ==========================================
+// 11. RUTAS PARA EL CATÁLOGO DE ENTIDADES
+// ==========================================
+
+// A) Leer todas las entidades
+app.get('/api/entidades', async (req, res) => {
+    try {
+        const resultado = await pool.query('SELECT * FROM entidades ORDER BY sigla ASC');
+        res.status(200).json(resultado.rows);
+    } catch (error) {
+        res.status(500).json({ error: 'Error al obtener entidades' });
+    }
+});
+
+// B) Crear una nueva entidad
+app.post('/api/entidades', async (req, res) => {
+    const { sigla, nombre_completo } = req.body;
+    try {
+        await pool.query(
+            'INSERT INTO entidades (sigla, nombre_completo) VALUES ($1, $2)', 
+            [sigla.toUpperCase(), nombre_completo]
+        );
+        res.status(201).json({ mensaje: 'Entidad registrada con éxito' });
+    } catch (error) {
+        res.status(500).json({ error: 'Error al crear la entidad' });
+    }
+});
+
+// C) Eliminar una entidad
+app.delete('/api/entidades/:id', async (req, res) => {
+    try {
+        await pool.query('DELETE FROM entidades WHERE id = $1', [req.params.id]);
+        res.status(200).json({ mensaje: 'Entidad eliminada' });
+    } catch (error) {
+        res.status(500).json({ error: 'Error al eliminar la entidad' });
     }
 });
 
