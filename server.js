@@ -182,3 +182,48 @@ app.get('/api/tramites', async (req, res) => {
         res.status(500).json({ error: 'Error interno al obtener los trámites' });
     }
 });
+// ==========================================
+// 7. RUTA PARA ACTUALIZAR UN TRÁMITE (EDITAR)
+// ==========================================
+app.put('/api/tramites/:id', async (req, res) => {
+    const idDelTramite = req.params.id;
+    const { titulo, codigo_interno, descripcion, entidad, modalidad, costo, requisitos, pasos } = req.body;
+
+    try {
+        const sql = `
+            UPDATE tramites 
+            SET titulo = $1, codigo_interno = $2, descripcion = $3, entidad = $4, 
+                modalidad = $5, costo = $6, requisitos = $7, pasos = $8
+            WHERE id = $9
+        `;
+        
+        const valores = [
+            titulo, codigo_interno, descripcion, entidad, modalidad, 
+            costo || 0, JSON.stringify(requisitos), JSON.stringify(pasos), idDelTramite
+        ];
+
+        await pool.query(sql, valores);
+        res.status(200).json({ mensaje: 'Trámite actualizado con éxito' });
+        
+    } catch (error) {
+        console.error("🚨 ERROR AL ACTUALIZAR TRÁMITE:", error);
+        res.status(500).json({ error: 'Error interno al actualizar' });
+    }
+});
+
+// ==========================================
+// 8. RUTA PARA ELIMINAR UN TRÁMITE
+// ==========================================
+app.delete('/api/tramites/:id', async (req, res) => {
+    const idDelTramite = req.params.id;
+
+    try {
+        // Ejecutamos la orden de borrado en la base de datos
+        await pool.query('DELETE FROM tramites WHERE id = $1', [idDelTramite]);
+        res.status(200).json({ mensaje: 'Trámite eliminado para siempre' });
+        
+    } catch (error) {
+        console.error("🚨 ERROR AL ELIMINAR TRÁMITE:", error);
+        res.status(500).json({ error: 'Error interno al eliminar' });
+    }
+});
