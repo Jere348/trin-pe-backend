@@ -374,6 +374,20 @@ app.delete('/api/entidades/:id', async (req, res) => {
     }
 });
 
+// D) Actualizar una entidad (EDITAR)
+app.put('/api/entidades/:id', async (req, res) => {
+    const { id } = req.params;
+    const { sigla, nombre_completo, logo_url } = req.body;
+    try {
+        await pool.query(
+            'UPDATE entidades SET sigla = $1, nombre_completo = $2, logo_url = $3 WHERE id = $4',
+            [sigla.toUpperCase(), nombre_completo, logo_url, id]
+        );
+        res.status(200).json({ mensaje: 'Entidad actualizada con éxito' });
+    } catch (error) {
+        res.status(500).json({ error: 'Error al actualizar la entidad' });
+    }
+});
 // ==========================================
 // 13. RUTAS PARA ALERTAS DEL SISTEMA
 // ==========================================
