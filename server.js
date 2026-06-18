@@ -119,6 +119,22 @@ app.post('/api/registro', async (req, res) => {
     }
 });
 
+// ==========================================
+// 2.8 CREAR TABLA DE FAVORITOS
+// ==========================================
+const crearTablaFavoritosQuery = `
+    CREATE TABLE IF NOT EXISTS tramites_favoritos (
+        id SERIAL PRIMARY KEY,
+        usuario_id INTEGER REFERENCES usuarios(id) ON DELETE CASCADE,
+        tramite_id INTEGER REFERENCES tramites(id) ON DELETE CASCADE,
+        fecha_guardado TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(usuario_id, tramite_id) -- Evita que guarden el mismo trámite dos veces
+    );
+`;
+pool.query(crearTablaFavoritosQuery)
+    .then(() => console.log('Tabla de favoritos verificada.'))
+    .catch((err) => console.error('Error al crear tabla favoritos:', err));
+
 // 4. RUTA DE INICIO DE SESIÓN
 app.post('/api/login', async (req, res) => {
     const { correo_dni, contrasena } = req.body;
@@ -140,7 +156,11 @@ app.post('/api/login', async (req, res) => {
 
         res.json({ 
             mensaje: 'Inicio de sesión exitoso', 
-            usuario: { nombre: usuario.nombre, rol: usuario.rol } 
+            usuario: { 
+                id: usuario.id,     // <--- ¡ESTE DATO ES LA LLAVE MAESTRA!
+                nombre: usuario.nombre, 
+                rol: usuario.rol 
+            } 
         });
 
     } catch (error) {
@@ -339,5 +359,59 @@ app.delete('/api/entidades/:id', async (req, res) => {
 const PORT = 5001; // <--- CAMBIAMOS A 5001
 app.listen(PORT, () => {
     console.log(`Servidor Backend corriendo en http://localhost:${PORT}`);
+});
+
+// ==========================================
+// 12. RUTAS PARA EL SISTEMA DE FAVORITOS
+// ==========================================
+
+// A) Guardar un trámite en favoritos
+app.post('/api/favoritos', async (req, res) => {
+    const { usuario_id, tramite_id } = req.body;
+    try {
+        await pool.query(
+            'INSERT INTO tramites_favoritos (usuario_id, tramite_id) VALUES ($1, $2)',
+            [usuario_id, tramite_id]
+        );
+        res.status(201).json({ mensaje: 'Trámite guardado en favoritos' });
+    } catch (error) {
+        // El código 23505 es de PostgreSQL e indica que se rompió la regla "UNIQUE" (ya lo había guardado)
+        if (error.code === '23505') { 
+            return res.status(400).json({ error: 'El trámite ya está en tus favoritos' });
+        }
+        res.status(500).json({ error: 'Error al guardar favorito' });
+    }
+});
+
+// B) Leer todos los favoritos de un ciudadano específico
+app.get('/api/favoritos/:usuario_id', async (req, res) => {
+    const { usuario_id } = req.params;
+    try {
+        // MAGIA SQL: Usamos JOIN para mezclar la tabla de favoritos con la info completa del trámite
+        const sql = `
+            SELECT t.* FROM tramites_favoritos tf
+            JOIN tramites t ON tf.tramite_id = t.id
+            WHERE tf.usuario_id = $1
+            ORDER BY tf.fecha_guardado DESC
+        `;
+        const resultado = await pool.query(sql, [usuario_id]);
+        res.status(200).json(resultado.rows);
+    } catch (error) {
+        res.status(500).json({ error: 'Error al cargar favoritos' });
+    }
+});
+
+// C) Eliminar un favorito (cuando el ciudadano le quita la estrella)
+app.delete('/api/favoritos/:usuario_id/:tramite_id', async (req, res) => {
+    const { usuario_id, tramite_id } = req.params;
+    try {
+        await pool.query(
+            'DELETE FROM tramites_favoritos WHERE usuario_id = $1 AND tramite_id = $2',
+            [usuario_id, tramite_id]
+        );
+        res.status(200).json({ mensaje: 'Favorito eliminado' });
+    } catch (error) {
+        res.status(500).json({ error: 'Error al eliminar favorito' });
+    }
 });
 
