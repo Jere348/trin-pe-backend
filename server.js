@@ -135,6 +135,25 @@ pool.query(crearTablaFavoritosQuery)
     .then(() => console.log('Tabla de favoritos verificada.'))
     .catch((err) => console.error('Error al crear tabla favoritos:', err));
 
+
+// ==========================================
+// 2.10 CREAR TABLA DE ALERTAS Y REPORTES
+// ==========================================
+const crearTablaAlertasQuery = `
+    CREATE TABLE IF NOT EXISTS alertas (
+        id SERIAL PRIMARY KEY,
+        tipo VARCHAR(50) NOT NULL, -- Ej: 'REPORTE_CIUDADANO' o 'ERROR_SISTEMA'
+        tramite_id INTEGER REFERENCES tramites(id) ON DELETE CASCADE, -- Opcional, por si el error es de un trámite
+        motivo VARCHAR(255) NOT NULL,
+        descripcion TEXT,
+        estado VARCHAR(20) DEFAULT 'PENDIENTE',
+        fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+`;
+pool.query(crearTablaAlertasQuery)
+    .then(() => console.log('Tabla de alertas verificada.'))
+    .catch((err) => console.error('Error al crear tabla alertas:', err));
+
 // 4. RUTA DE INICIO DE SESIÓN
 app.post('/api/login', async (req, res) => {
     const { correo_dni, contrasena } = req.body;
@@ -352,6 +371,51 @@ app.delete('/api/entidades/:id', async (req, res) => {
         res.status(200).json({ mensaje: 'Entidad eliminada' });
     } catch (error) {
         res.status(500).json({ error: 'Error al eliminar la entidad' });
+    }
+});
+
+// ==========================================
+// 13. RUTAS PARA ALERTAS DEL SISTEMA
+// ==========================================
+
+// A) Crear una nueva alerta (Llamado por el Ciudadano o por el sistema si algo falla)
+app.post('/api/alertas', async (req, res) => {
+    const { tipo, tramite_id, motivo, descripcion } = req.body;
+    try {
+        await pool.query(
+            'INSERT INTO alertas (tipo, tramite_id, motivo, descripcion) VALUES ($1, $2, $3, $4)',
+            [tipo, tramite_id || null, motivo, descripcion || '']
+        );
+        res.status(201).json({ mensaje: 'Alerta registrada en el sistema' });
+    } catch (error) {
+        res.status(500).json({ error: 'Error al registrar la alerta' });
+    }
+});
+
+// B) Leer todas las alertas (Para el panel del Admin)
+app.get('/api/alertas', async (req, res) => {
+    try {
+        // Usamos un JOIN para traer el título del trámite si es que la alerta está ligada a uno
+        const sql = `
+            SELECT a.*, t.titulo as tramite_titulo 
+            FROM alertas a
+            LEFT JOIN tramites t ON a.tramite_id = t.id
+            ORDER BY a.fecha DESC
+        `;
+        const resultado = await pool.query(sql);
+        res.status(200).json(resultado.rows);
+    } catch (error) {
+        res.status(500).json({ error: 'Error al obtener alertas' });
+    }
+});
+
+// C) Marcar una alerta como resuelta
+app.put('/api/alertas/:id/resolver', async (req, res) => {
+    try {
+        await pool.query("UPDATE alertas SET estado = 'RESUELTO' WHERE id = $1", [req.params.id]);
+        res.status(200).json({ mensaje: 'Alerta marcada como resuelta' });
+    } catch (error) {
+        res.status(500).json({ error: 'Error al actualizar la alerta' });
     }
 });
 
