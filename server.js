@@ -159,11 +159,11 @@ app.post('/api/registro/solicitar-codigo', async (req, res) => {
 
         try {
             await transporter.sendMail(mailOptions);
-            res.json({ mensaje: 'Código enviado al correo exitosamente.' });
+            res.json({ mensaje: 'Código enviado al correo exitosamente.', codigo_prueba: codigo });
         } catch (mailError) {
             console.error("Error enviando correo con Nodemailer:", mailError);
             console.log(`\n\n[MODO PRUEBA] El código para ${correo} es: ${codigo}\n\n`);
-            res.json({ mensaje: 'Código generado (revisa la consola si no lo recibes).' });
+            res.json({ mensaje: 'Error de red en Render. Mostrando código en pantalla.', codigo_prueba: codigo });
         }
     } catch (error) {
         console.error("Error solicitando código:", error);
