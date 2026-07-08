@@ -173,13 +173,16 @@ app.post('/api/login', async (req, res) => {
             return res.status(401).json({ error: 'Contraseña incorrecta' });
         }
 
+        const token = firmarToken(usuario);
+
         res.json({ 
             mensaje: 'Inicio de sesión exitoso', 
             usuario: { 
                 id: usuario.id,     // <--- ¡ESTE DATO ES LA LLAVE MAESTRA!
                 nombre: usuario.nombre, 
                 rol: usuario.rol 
-            } 
+            },
+            token
         });
 
     } catch (error) {
