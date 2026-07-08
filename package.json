@@ -5,7 +5,8 @@
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "nodemailer": "^9.0.3",
-    "pg": "^8.21.0"
+    "pg": "^8.21.0",
+    "resend": "^6.17.2"
   },
   "name": "trin-pe-backend",
   "version": "1.0.0",

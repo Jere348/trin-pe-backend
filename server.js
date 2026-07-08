@@ -16,19 +16,13 @@ app.use(express.json());
 // Estructura: { "correo@ejemplo.com": { codigo: "123456", datos: {...}, expiracion: Date.now() + 5*60*1000 } }
 const codigosVerificacion = new Map();
 
-// Configuración de envío de correos (Ajustada para Render)
+// Configuración de envío de correos con Gmail
 const transporter = nodemailer.createTransport({
-    host: '64.233.190.108', // IP fija de smtp.gmail.com para forzar IPv4
-    port: 587,
-    secure: false, // STARTTLS
-    tls: {
-        servername: 'smtp.gmail.com' // Necesario para evitar error de certificado SSL
-    },
+    service: 'gmail',
     auth: {
         user: process.env.EMAIL_USER || 'sistematrinpe@gmail.com',
-        pass: process.env.EMAIL_PASS || '' 
-    },
-    connectionTimeout: 10000 
+        pass: process.env.EMAIL_PASS || 'drwr tqwb fnfu xars' // Contraseña de aplicación por defecto
+    }
 });
 
 const TOKEN_SECRET = process.env.AUTH_SECRET || 'trin-pe-dev-secret-change-me';
@@ -156,16 +150,16 @@ app.post('/api/registro/solicitar-codigo', async (req, res) => {
             from: process.env.EMAIL_USER || 'sistematrinpe@gmail.com',
             to: correo,
             subject: 'Código de verificación - Trámite Inteligente Perú',
-            text: `¡Hola!\n\nTu código de verificación es: ${codigo}\n\nEs válido por 10 minutos. No compartas este código con nadie.`
+            html: `<p>¡Hola!</p><p>Tu código de verificación es: <strong>${codigo}</strong></p><p>Es válido por 10 minutos. No compartas este código con nadie.</p>`
         };
 
         try {
             await transporter.sendMail(mailOptions);
-            res.json({ mensaje: 'Código enviado al correo.' });
+            res.json({ mensaje: 'Código enviado al correo exitosamente.' });
         } catch (mailError) {
-            console.error("Error enviando correo:", mailError);
-            console.log(`\n\n[MODO PRUEBA - SIN CONTRASEÑA DE APP] El código para ${correo} es: ${codigo}\n\n`);
-            res.json({ mensaje: 'Código enviado (revisa la consola si no lo recibes).' });
+            console.error("Error enviando correo con Nodemailer:", mailError);
+            console.log(`\n\n[MODO PRUEBA] El código para ${correo} es: ${codigo}\n\n`);
+            res.json({ mensaje: 'Código generado (revisa la consola si no lo recibes).' });
         }
     } catch (error) {
         console.error("Error solicitando código:", error);
