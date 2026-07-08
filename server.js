@@ -18,10 +18,12 @@ const codigosVerificacion = new Map();
 
 // Configuración de envío de correos (Ajustada para Render)
 const transporter = nodemailer.createTransport({
-    host: 'smtp.gmail.com',
+    host: '64.233.190.108', // IP fija de smtp.gmail.com para forzar IPv4
     port: 587,
     secure: false, // STARTTLS
-    family: 4, // Fuerza la resolución de IPv4 para nodemailer
+    tls: {
+        servername: 'smtp.gmail.com' // Necesario para evitar error de certificado SSL
+    },
     auth: {
         user: process.env.EMAIL_USER || 'sistematrinpe@gmail.com',
         pass: process.env.EMAIL_PASS || '' 
