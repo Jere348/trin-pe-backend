@@ -6,7 +6,7 @@ const cors = require('cors');
 const { Pool } = require('pg'); 
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
-const nodemailer = require('nodemailer');
+const emailjs = require('@emailjs/nodejs');
 
 const app = express();
 app.use(cors());
@@ -16,17 +16,10 @@ app.use(express.json());
 // Estructura: { "correo@ejemplo.com": { codigo: "123456", datos: {...}, expiracion: Date.now() + 5*60*1000 } }
 const codigosVerificacion = new Map();
 
-const transporter = nodemailer.createTransport({
-    host: '64.233.190.108', // IP fija de smtp.gmail.com (IPv4) para evadir el error de Render
-    port: 465,
-    secure: true,
-    tls: {
-        servername: 'smtp.gmail.com'
-    },
-    auth: {
-        user: process.env.EMAIL_USER || 'sistematrinpe@gmail.com',
-        pass: process.env.EMAIL_PASS || 'drwrtqwbfnfuxars'
-    }
+// Inicializar EmailJS con las claves del usuario
+emailjs.init({
+    publicKey: '3s9_O4YCDJ2Ey4-PK',
+    privateKey: '4TxKIqT9GJewAA75niMJp',
 });
 
 const TOKEN_SECRET = process.env.AUTH_SECRET || 'trin-pe-dev-secret-change-me';
@@ -150,18 +143,18 @@ app.post('/api/registro/solicitar-codigo', async (req, res) => {
             expiracion: Date.now() + 10 * 60 * 1000 // 10 minutos
         });
 
-        const mailOptions = {
-            from: process.env.EMAIL_USER || 'sistematrinpe@gmail.com',
-            to: correo,
-            subject: 'Código de verificación - Trámite Inteligente Perú',
-            html: `<p>¡Hola!</p><p>Tu código de verificación es: <strong>${codigo}</strong></p><p>Es válido por 10 minutos. No compartas este código con nadie.</p>`
-        };
-
         try {
-            await transporter.sendMail(mailOptions);
-            res.json({ mensaje: 'Código enviado al correo exitosamente.', codigo_prueba: codigo });
+            await emailjs.send(
+                'service_ghd1yqt',
+                'template_tfq8r8a',
+                {
+                    to_email: correo,
+                    codigo: codigo
+                }
+            );
+            res.json({ mensaje: 'Código enviado al correo exitosamente con EmailJS.', codigo_prueba: codigo });
         } catch (mailError) {
-            console.error("Error enviando correo con Nodemailer:", mailError);
+            console.error("Error enviando correo con EmailJS:", mailError);
             console.log(`\n\n[MODO PRUEBA] El código para ${correo} es: ${codigo}\n\n`);
             res.json({ mensaje: 'Error de red en Render. Mostrando código en pantalla.', codigo_prueba: codigo });
         }
