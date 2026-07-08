@@ -7,6 +7,9 @@ const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const emailjs = require('@emailjs/nodejs');
+const { GoogleGenAI } = require('@google/genai');
+
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 const app = express();
 app.use(cors());
@@ -552,8 +555,54 @@ app.put('/api/alertas/:id/resolver', async (req, res) => {
     }
 });
 
+// ==========================================
+// 14. RUTAS PARA CHATBOT CON IA (GEMINI)
+// ==========================================
+
+app.post('/api/chat', async (req, res) => {
+    const { mensaje, historial } = req.body;
+    
+    try {
+        // 1. Obtener contexto de trámites para inyectar en la IA
+        const tramitesContexto = await pool.query('SELECT titulo, codigo_interno, descripcion, costo, modalidad, entidad FROM tramites LIMIT 20');
+        const tramitesString = JSON.stringify(tramitesContexto.rows);
+
+        // 2. Construir el prompt del sistema (Reglas para la IA)
+        const systemPrompt = `Eres un asistente virtual experto del Estado Peruano para la plataforma Trin.pe. 
+Tu misión es ayudar a los ciudadanos a entender cómo realizar sus trámites. 
+Eres muy amable, formal pero claro. 
+IMPORTANTE: Basa tus respuestas ÚNICAMENTE en la siguiente lista de trámites disponibles en nuestra base de datos. Si te preguntan algo que no está aquí, di amablemente que no tienes esa información y sugiere buscar en el catálogo oficial.
+Lista de trámites: ${tramitesString}`;
+
+        // 3. Preparar el historial de mensajes
+        const contents = [];
+        if (historial && historial.length > 0) {
+            historial.forEach(msg => {
+                contents.push({ role: msg.rol === 'usuario' ? 'user' : 'model', parts: [{ text: msg.texto }] });
+            });
+        }
+        // Añadir el mensaje actual
+        contents.push({ role: 'user', parts: [{ text: mensaje }] });
+
+        // 4. Llamar a Gemini
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: contents,
+            config: {
+                systemInstruction: systemPrompt,
+                temperature: 0.2, // Respuestas más precisas y menos creativas
+            }
+        });
+
+        res.status(200).json({ respuesta: response.text });
+    } catch (error) {
+        console.error('Error en Chatbot IA:', error);
+        res.status(500).json({ error: 'Hubo un error al procesar tu mensaje con la IA.' });
+    }
+});
+
 // 5. ENCENDER EL SERVIDOR LOCAL
-const PORT = 5001; // <--- CAMBIAMOS A 5001
+const PORT = process.env.PORT || 5001;
 app.listen(PORT, () => {
     console.log(`Servidor Backend corriendo en http://localhost:${PORT}`);
 });
