@@ -528,9 +528,9 @@ app.post('/api/alertas', async (req, res) => {
 // B) Leer todas las alertas (Para el panel del Admin)
 app.get('/api/alertas', async (req, res) => {
     try {
-        // Usamos un JOIN para traer el título del trámite si es que la alerta está ligada a uno
+        // Usamos un JOIN para traer el título y código del trámite
         const sql = `
-            SELECT a.*, t.titulo as tramite_titulo 
+            SELECT a.*, t.titulo as tramite_titulo, t.codigo_interno as tramite_codigo
             FROM alertas a
             LEFT JOIN tramites t ON a.tramite_id = t.id
             ORDER BY a.fecha DESC
