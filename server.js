@@ -14,13 +14,16 @@ app.use(express.json());
 // Estructura: { "correo@ejemplo.com": { codigo: "123456", datos: {...}, expiracion: Date.now() + 5*60*1000 } }
 const codigosVerificacion = new Map();
 
-// Configuración de envío de correos
+// Configuración de envío de correos (Ajustada para Render)
 const transporter = nodemailer.createTransport({
-    service: 'gmail',
+    host: 'smtp.gmail.com',
+    port: 465,
+    secure: true,
     auth: {
         user: process.env.EMAIL_USER || 'sistematrinpe@gmail.com',
-        pass: process.env.EMAIL_PASS || '' // Necesita contraseña de aplicación
-    }
+        pass: process.env.EMAIL_PASS || '' // IMPORTANTE: Agregar a las variables de entorno de Render
+    },
+    connectionTimeout: 10000 // Para que no demore 1 minuto si hay error de red
 });
 
 const TOKEN_SECRET = process.env.AUTH_SECRET || 'trin-pe-dev-secret-change-me';
