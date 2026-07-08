@@ -21,11 +21,12 @@ const transporter = nodemailer.createTransport({
     host: 'smtp.gmail.com',
     port: 465,
     secure: true,
+    family: 4, // Fuerza la resolución de IPv4 para nodemailer
     auth: {
         user: process.env.EMAIL_USER || 'sistematrinpe@gmail.com',
-        pass: process.env.EMAIL_PASS || '' // IMPORTANTE: Agregar a las variables de entorno de Render
+        pass: process.env.EMAIL_PASS || '' 
     },
-    connectionTimeout: 10000 // Para que no demore 1 minuto si hay error de red
+    connectionTimeout: 10000 
 });
 
 const TOKEN_SECRET = process.env.AUTH_SECRET || 'trin-pe-dev-secret-change-me';
