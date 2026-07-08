@@ -2,10 +2,31 @@ const express = require('express');
 const cors = require('cors');
 const { Pool } = require('pg'); 
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+const TOKEN_SECRET = process.env.AUTH_SECRET || 'trin-pe-dev-secret-change-me';
+const TOKEN_TTL_MS = 1000 * 60 * 60 * 8;
+
+const base64Url = (input) => Buffer.from(input).toString('base64url');
+
+const firmarToken = (usuario) => {
+    const header = base64Url(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
+    const payload = base64Url(JSON.stringify({
+        sub: usuario.id,
+        nombre: usuario.nombre,
+        rol: usuario.rol,
+        exp: Date.now() + TOKEN_TTL_MS,
+    }));
+    const signature = crypto
+        .createHmac('sha256', TOKEN_SECRET)
+        .update(`${header}.${payload}`)
+        .digest('base64url');
+    return `${header}.${payload}.${signature}`;
+};
 
 // 1. CONEXIÓN A LA BASE DE DATOS EN LA NUBE (SUPABASE)
 const connectionString = 'postgresql://postgres.qzesfdluxomapvspzpie:RodrigoBackend2026@aws-1-us-east-2.pooler.supabase.com:6543/postgres';
@@ -168,6 +189,9 @@ app.post('/api/login', async (req, res) => {
 
         const usuario = resultado.rows[0];
 
+        if (!usuario.contrasena) {
+            return res.status(401).json({ error: 'Contraseña no establecida para este usuario' });
+        }
         const contrasenaValida = await bcrypt.compare(contrasena, usuario.contrasena);
         if (!contrasenaValida) {
             return res.status(401).json({ error: 'Contraseña incorrecta' });
@@ -186,6 +210,7 @@ app.post('/api/login', async (req, res) => {
         });
 
     } catch (error) {
+        console.error("🚨 ERROR DURANTE EL LOGIN:", error);
         res.status(500).json({ error: 'Error en el servidor durante el login' });
     }
 });
