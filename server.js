@@ -21,7 +21,7 @@ const transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
         user: process.env.EMAIL_USER || 'sistematrinpe@gmail.com',
-        pass: process.env.EMAIL_PASS || 'drwr tqwb fnfu xars' // Contraseña de aplicación por defecto
+        pass: process.env.EMAIL_PASS || 'drwrtqwbfnfuxars' // Contraseña de aplicación por defecto
     }
 });
 
