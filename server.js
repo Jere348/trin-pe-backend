@@ -16,12 +16,16 @@ app.use(express.json());
 // Estructura: { "correo@ejemplo.com": { codigo: "123456", datos: {...}, expiracion: Date.now() + 5*60*1000 } }
 const codigosVerificacion = new Map();
 
-// Configuración de envío de correos con Gmail
 const transporter = nodemailer.createTransport({
-    service: 'gmail',
+    host: '64.233.190.108', // IP fija de smtp.gmail.com (IPv4) para evadir el error de Render
+    port: 465,
+    secure: true,
+    tls: {
+        servername: 'smtp.gmail.com'
+    },
     auth: {
         user: process.env.EMAIL_USER || 'sistematrinpe@gmail.com',
-        pass: process.env.EMAIL_PASS || 'drwrtqwbfnfuxars' // Contraseña de aplicación por defecto
+        pass: process.env.EMAIL_PASS || 'drwrtqwbfnfuxars'
     }
 });
 
