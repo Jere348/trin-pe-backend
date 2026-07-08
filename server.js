@@ -1,12 +1,27 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const { Pool } = require('pg'); 
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
+const nodemailer = require('nodemailer');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+// Mapa en memoria para almacenar los códigos de verificación temporalmente
+// Estructura: { "correo@ejemplo.com": { codigo: "123456", datos: {...}, expiracion: Date.now() + 5*60*1000 } }
+const codigosVerificacion = new Map();
+
+// Configuración de envío de correos
+const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+        user: process.env.EMAIL_USER || 'sistematrinpe@gmail.com',
+        pass: process.env.EMAIL_PASS || '' // Necesita contraseña de aplicación
+    }
+});
 
 const TOKEN_SECRET = process.env.AUTH_SECRET || 'trin-pe-dev-secret-change-me';
 const TOKEN_TTL_MS = 1000 * 60 * 60 * 8;
@@ -110,7 +125,84 @@ pool.query(crearTablaEntidadesQuery)
     })
     .catch((err) => console.error('Error al verificar tabla entidades:', err));
 
-// 3. RUTA DE REGISTRO
+// 3.1 RUTA PARA SOLICITAR CÓDIGO DE VERIFICACIÓN
+app.post('/api/registro/solicitar-codigo', async (req, res) => {
+    const { correo, dni } = req.body;
+    
+    try {
+        const checkSql = `SELECT * FROM usuarios WHERE correo = $1 OR dni = $2`;
+        const checkRes = await pool.query(checkSql, [correo, dni]);
+        if (checkRes.rows.length > 0) {
+            return res.status(400).json({ error: 'El DNI o Correo ya están registrados.' });
+        }
+
+        const codigo = Math.floor(100000 + Math.random() * 900000).toString();
+        
+        codigosVerificacion.set(correo, {
+            codigo,
+            datosUsuario: req.body,
+            expiracion: Date.now() + 10 * 60 * 1000 // 10 minutos
+        });
+
+        const mailOptions = {
+            from: process.env.EMAIL_USER || 'sistematrinpe@gmail.com',
+            to: correo,
+            subject: 'Código de verificación - Trámite Inteligente Perú',
+            text: `¡Hola!\n\nTu código de verificación es: ${codigo}\n\nEs válido por 10 minutos. No compartas este código con nadie.`
+        };
+
+        try {
+            await transporter.sendMail(mailOptions);
+            res.json({ mensaje: 'Código enviado al correo.' });
+        } catch (mailError) {
+            console.error("Error enviando correo:", mailError);
+            console.log(`\n\n[MODO PRUEBA - SIN CONTRASEÑA DE APP] El código para ${correo} es: ${codigo}\n\n`);
+            res.json({ mensaje: 'Código enviado (revisa la consola si no lo recibes).' });
+        }
+    } catch (error) {
+        console.error("Error solicitando código:", error);
+        res.status(500).json({ error: 'Error interno del servidor' });
+    }
+});
+
+// 3.2 RUTA PARA VERIFICAR CÓDIGO Y REGISTRAR
+app.post('/api/registro/verificar', async (req, res) => {
+    const { correo, codigo } = req.body;
+    
+    const registroTemp = codigosVerificacion.get(correo);
+    if (!registroTemp) {
+        return res.status(400).json({ error: 'No se encontró un código o el tiempo expiró. Vuelve a solicitarlo.' });
+    }
+    if (registroTemp.expiracion < Date.now()) {
+        codigosVerificacion.delete(correo);
+        return res.status(400).json({ error: 'El código ha expirado. Vuelve a solicitarlo.' });
+    }
+    if (registroTemp.codigo !== codigo) {
+        return res.status(400).json({ error: 'Código incorrecto.' });
+    }
+
+    const { nombre, dni, celular, contrasena, rol } = registroTemp.datosUsuario;
+    
+    try {
+        const salt = await bcrypt.genSalt(10);
+        const contrasenaEncriptada = await bcrypt.hash(contrasena, salt);
+
+        const sql = `INSERT INTO usuarios (nombre, dni, celular, correo, contrasena, rol) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`;
+        const valores = [nombre, dni, celular, correo, contrasenaEncriptada, rol || 'Ciudadano'];
+
+        const resultado = await pool.query(sql, valores);
+        codigosVerificacion.delete(correo);
+        res.json({ mensaje: 'Usuario registrado y verificado con éxito', id: resultado.rows[0].id });
+    } catch (error) {
+        console.error("Error registrando tras verificar:", error);
+        if (error.code === '23505') { 
+            return res.status(400).json({ error: 'El DNI o Correo ya están registrados.' });
+        }
+        res.status(500).json({ error: 'Error al crear el usuario en la base de datos' });
+    }
+});
+
+// 3.3 RUTA DE REGISTRO DIRECTO (LEGACY)
 app.post('/api/registro', async (req, res) => {
     // ESTA ES LA ALARMA NUEVA
     console.log("=======================================");
