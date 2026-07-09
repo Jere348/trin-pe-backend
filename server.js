@@ -91,8 +91,16 @@ const crearTablaTramitesQuery = `
 `;
 
 pool.query(crearTablaTramitesQuery)
-    .then(() => console.log('Tabla de trámites verificada/creada.'))
-    .catch((err) => console.error('Error al crear la tabla de trámites:', err));
+    .then(() => {
+        console.log('Tabla de trámites verificada.');
+        // Añadir columnas de tiempo si no existen
+        return pool.query(`
+            ALTER TABLE tramites 
+            ADD COLUMN IF NOT EXISTS tiempo_tramite TEXT,
+            ADD COLUMN IF NOT EXISTS tiempo_resolucion TEXT;
+        `);
+    })
+    .catch((err) => console.error('Error al crear/actualizar la tabla de trámites:', err));
 
 
 // 2.6 CREAR LA TABLA DE MÉTRICAS DE BÚSQUEDA
@@ -323,27 +331,30 @@ app.post('/api/tramites', async (req, res) => {
         modalidad, 
         costo, 
         requisitos, 
-        pasos 
+        pasos,
+        tiempo_tramite,
+        tiempo_resolucion
     } = req.body;
 
     try {
         const sql = `
             INSERT INTO tramites 
-            (titulo, codigo_interno, descripcion, entidad, modalidad, costo, requisitos, pasos) 
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
+            (titulo, codigo_interno, descripcion, entidad, modalidad, costo, requisitos, pasos, tiempo_tramite, tiempo_resolucion) 
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) 
             RETURNING id
         `;
         
-        // Convertimos los arrays a JSON (texto) para guardarlos en PostgreSQL
         const valores = [
             titulo, 
             codigo_interno, 
             descripcion, 
             entidad, 
             modalidad, 
-            costo || 0, // Si no hay costo, ponemos 0
+            costo || 0, 
             JSON.stringify(requisitos), 
-            JSON.stringify(pasos)
+            JSON.stringify(pasos),
+            tiempo_tramite || '',
+            tiempo_resolucion || ''
         ];
 
         const resultado = await pool.query(sql, valores);
@@ -377,19 +388,22 @@ app.get('/api/tramites', async (req, res) => {
 // ==========================================
 app.put('/api/tramites/:id', async (req, res) => {
     const idDelTramite = req.params.id;
-    const { titulo, codigo_interno, descripcion, entidad, modalidad, costo, requisitos, pasos } = req.body;
+    const { titulo, codigo_interno, descripcion, entidad, modalidad, costo, requisitos, pasos, tiempo_tramite, tiempo_resolucion } = req.body;
 
     try {
         const sql = `
             UPDATE tramites 
             SET titulo = $1, codigo_interno = $2, descripcion = $3, entidad = $4, 
-                modalidad = $5, costo = $6, requisitos = $7, pasos = $8
-            WHERE id = $9
+                modalidad = $5, costo = $6, requisitos = $7, pasos = $8,
+                tiempo_tramite = $9, tiempo_resolucion = $10
+            WHERE id = $11
         `;
         
         const valores = [
             titulo, codigo_interno, descripcion, entidad, modalidad, 
-            costo || 0, JSON.stringify(requisitos), JSON.stringify(pasos), idDelTramite
+            costo || 0, JSON.stringify(requisitos), JSON.stringify(pasos),
+            tiempo_tramite || '', tiempo_resolucion || '',
+            idDelTramite
         ];
 
         await pool.query(sql, valores);
